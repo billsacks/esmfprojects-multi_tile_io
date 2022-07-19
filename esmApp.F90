@@ -145,7 +145,7 @@ contains
     ! Try to write field, this is failing !!!
     call ESMF_FieldWrite(field, fileName=fname, variableName='dummy', overwrite=.true., rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-     line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   end subroutine write_multitile
 
@@ -176,6 +176,19 @@ program esmApp
        decomp_dim1 = [1,2,1,3,1,1], &
        decomp_dim2 = [1,1,1,1,1,2], &
        fname = 'dummy_mulitileA.nc')
+
+  ! Similar to the last version, but changing which tiles have multiple DEs; in
+  ! particular, put multiple on the first tile
+  call write_multitile( &
+       decomp_dim1 = [3,1,2,1,1,1], &
+       decomp_dim2 = [1,1,1,1,1,2], &
+       fname = 'dummy_multitileB.nc')
+
+  ! Again similar, but swapping dim1 and dim2
+  call write_multitile( &
+       decomp_dim1 = [1,1,1,1,1,2], &
+       decomp_dim2 = [3,1,2,1,1,1], &
+       fname = 'dummy_multitileC.nc')
 
   ! Finalize ESMF
   call ESMF_Finalize()
