@@ -19,10 +19,14 @@ program esmApp
     line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   ! Set decomposition
-  ! The layout is fixes as 3,8 which means 3*8*ntiles = 144 core need to be used
+  ! Tiles 1, 3 and 5 each have one DE; tile 2 has 2 DEs along dimension 1; tile 4 has 3
+  ! DEs along dimension 1; tile 6 has 2 DEs along dimension 2. The total processor count
+  ! should be 10.
+  decomptile(:,:) = 1
+  decomptile(1,2) = 2
+  decomptile(1,4) = 3
+  decomptile(2,6) = 2
   do n = 1, ntiles
-     decomptile(1,n) = 3
-     decomptile(2,n) = 8
      decompflagPTile(:,n) = (/ ESMF_DECOMP_SYMMEDGEMAX, ESMF_DECOMP_SYMMEDGEMAX /)
   end do
 
