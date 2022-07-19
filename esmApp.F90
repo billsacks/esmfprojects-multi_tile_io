@@ -139,9 +139,9 @@ contains
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Try to write field, this is failing !!!
-    !call ESMF_FieldWrite(field, fileName='dummy.nc', variableName='dummy', overwrite=.true., rc=rc)
-    !if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-    !  line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    call ESMF_FieldWrite(field, fileName='dummy.nc', variableName='dummy', overwrite=.true., rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+     line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   end subroutine write_multitile
 
