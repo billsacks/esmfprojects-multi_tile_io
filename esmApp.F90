@@ -1,11 +1,93 @@
-module multi_tile_mod
+module test_writer
   use ESMF
   implicit none
   private
 
+  public :: write_singletile
   public :: write_multitile
 
 contains
+  subroutine write_singletile()
+    type(ESMF_Grid) :: grid
+    integer :: rc
+    integer :: i, j
+    integer :: lbnd(2), ubnd(2)
+    real(ESMF_KIND_R8), pointer :: coordX(:), coordY(:)
+    type(ESMF_ArraySpec) :: arraySpec
+    type(ESMF_Field) :: field
+
+    ! ------------------------------------------------------------------------
+    ! Create grid
+    ! ------------------------------------------------------------------------
+
+    ! The grid creation here follows
+    ! http://earthsystemmodeling.org/docs/nightly/develop/ESMF_refdoc/node5.html#SECTION05083100000000000000
+
+    ! Note 10 DEs, in agreement with write_multitile
+    grid = ESMF_GridCreateNoPeriDim( &
+         maxIndex = [10, 20], &
+         regDecomp = [2, 5], &
+         coordSys = ESMF_COORDSYS_CART, &
+         coordDep1 = [1], &
+         coordDep2 = [2], &
+         indexflag = ESMF_INDEX_GLOBAL, &
+         rc = rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    call ESMF_GridAddCoord(grid, staggerloc=ESMF_STAGGERLOC_CENTER, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    call ESMF_GridGetCoord(grid, coordDim=1, localDE=0, &
+         staggerloc=ESMF_STAGGERLOC_CENTER, &
+         computationalLBound=lbnd, computationalUBound=ubnd, &
+         farrayPtr=coordX, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    do i = lbnd(1), ubnd(1)
+       coordX(i) = i*10.0
+    end do
+
+    call ESMF_GridGetCoord(grid, coordDim=2, localDE=0, &
+         staggerloc=ESMF_STAGGERLOC_CENTER, &
+         computationalLBound=lbnd, computationalUBound=ubnd, &
+         farrayPtr=coordY, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    do j = lbnd(1), ubnd(1)
+       coordY(j) = j*10.0
+    end do
+
+    ! ------------------------------------------------------------------------
+    ! Create field
+    ! ------------------------------------------------------------------------
+
+    ! Set type and rank for ESMF arrayspec
+    call ESMF_ArraySpecSet(arraySpec, typekind=ESMF_TYPEKIND_R8, rank=2, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! Create field
+    field = ESMF_FieldCreate(grid, arraySpec, staggerloc=ESMF_STAGGERLOC_CENTER, &
+         indexflag=ESMF_INDEX_GLOBAL, name='dummy', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! Fill field
+    call ESMF_FieldFill(field, dataFillScheme='sincos', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! ------------------------------------------------------------------------
+    ! Write field
+    ! ------------------------------------------------------------------------
+    call ESMF_FieldWrite(field, fileName='dummy_singletile.nc', variableName='dummy', overwrite=.true., rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  end subroutine write_singletile
+
   subroutine write_multitile()
     type(ESMF_Grid) :: grid
     integer :: rc
@@ -63,11 +145,11 @@ contains
 
   end subroutine write_multitile
 
-end module multi_tile_mod
+end module test_writer
 
 program esmApp
   use ESMF
-  use multi_tile_mod
+  use test_writer
   implicit none
 
   integer :: rc
@@ -77,6 +159,7 @@ program esmApp
   if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+  call write_singletile()
   call write_multitile()
 
   ! Finalize ESMF
