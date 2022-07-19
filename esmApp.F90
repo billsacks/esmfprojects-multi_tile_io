@@ -7,7 +7,11 @@ module test_writer
   public :: write_multitile
 
 contains
-  subroutine write_singletile()
+  subroutine write_singletile(decomp_dim1, decomp_dim2, fname)
+    integer, intent(in) :: decomp_dim1
+    integer, intent(in) :: decomp_dim2
+    character(len=*), intent(in) :: fname
+
     type(ESMF_Grid) :: grid
     integer :: rc
     integer :: i, j
@@ -23,10 +27,9 @@ contains
     ! The grid creation here follows
     ! http://earthsystemmodeling.org/docs/nightly/develop/ESMF_refdoc/node5.html#SECTION05083100000000000000
 
-    ! Note 10 DEs, in agreement with write_multitile
     grid = ESMF_GridCreateNoPeriDim( &
          maxIndex = [10, 20], &
-         regDecomp = [2, 5], &
+         regDecomp = [decomp_dim1, decomp_dim2], &
          coordSys = ESMF_COORDSYS_CART, &
          coordDep1 = [1], &
          coordDep2 = [2], &
@@ -82,13 +85,19 @@ contains
     ! ------------------------------------------------------------------------
     ! Write field
     ! ------------------------------------------------------------------------
-    call ESMF_FieldWrite(field, fileName='dummy_singletile.nc', variableName='dummy', overwrite=.true., rc=rc)
+    call ESMF_FieldWrite(field, fileName=fname, variableName='dummy', overwrite=.true., rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   end subroutine write_singletile
 
-  subroutine write_multitile()
+  subroutine write_multitile(decomp_dim1, decomp_dim2, fname)
+    ! decomp_dim1 and decomp_dim2 should be of size ntiles, and should have a value for
+    ! each tile
+    integer, intent(in) :: decomp_dim1(:)
+    integer, intent(in) :: decomp_dim2(:)
+    character(len=*), intent(in) :: fname
+
     type(ESMF_Grid) :: grid
     integer :: rc
     character(len=255), parameter :: mosaic_file = 'data/C96_mosaic.nc'
@@ -101,13 +110,8 @@ contains
     type(ESMF_Decomp_Flag) :: decompflagPTile(2,ntiles)
 
     ! Set decomposition
-    ! Tiles 1, 3 and 5 each have one DE; tile 2 has 2 DEs along dimension 1; tile 4 has 3
-    ! DEs along dimension 1; tile 6 has 2 DEs along dimension 2. The total processor count
-    ! should be 10.
-    decomptile(:,:) = 1
-    decomptile(1,2) = 2
-    decomptile(1,4) = 3
-    decomptile(2,6) = 2
+    decomptile(1,:) = decomp_dim1
+    decomptile(2,:) = decomp_dim2
     do n = 1, ntiles
        decompflagPTile(:,n) = (/ ESMF_DECOMP_SYMMEDGEMAX, ESMF_DECOMP_SYMMEDGEMAX /)
     end do
@@ -139,7 +143,7 @@ contains
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Try to write field, this is failing !!!
-    call ESMF_FieldWrite(field, fileName='dummy.nc', variableName='dummy', overwrite=.true., rc=rc)
+    call ESMF_FieldWrite(field, fileName=fname, variableName='dummy', overwrite=.true., rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
      line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
@@ -159,8 +163,19 @@ program esmApp
   if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-  call write_singletile()
-  call write_multitile()
+  ! Note 10 DEs, in agreement with write_multitile
+  call write_singletile( &
+       decomp_dim1 = 2, &
+       decomp_dim2 = 5, &
+       fname = 'dummy_singletile.nc')
+
+  ! Tiles 1, 3 and 5 each have one DE; tile 2 has 2 DEs along dimension 1; tile 4 has 3
+  ! DEs along dimension 1; tile 6 has 2 DEs along dimension 2. The total processor count
+  ! should be 10.
+  call write_multitile( &
+       decomp_dim1 = [1,2,1,3,1,1], &
+       decomp_dim2 = [1,1,1,1,1,2], &
+       fname = 'dummy_mulitileA.nc')
 
   ! Finalize ESMF
   call ESMF_Finalize()
