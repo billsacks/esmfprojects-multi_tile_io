@@ -175,7 +175,7 @@ program esmApp
   call write_multitile( &
        decomp_dim1 = [1,2,1,3,1,1], &
        decomp_dim2 = [1,1,1,1,1,2], &
-       fname = 'dummy_mulitileA.nc')
+       fname = 'dummy_multitileA.nc')
 
   ! Similar to the last version, but changing which tiles have multiple DEs; in
   ! particular, put multiple on the first tile
