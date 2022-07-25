@@ -106,8 +106,11 @@ contains
     integer :: decomptile(2,ntiles)
     integer :: n
     type(ESMF_ArraySpec) :: arraySpec
-    type(ESMF_Field) :: field
+    type(ESMF_Field) :: field_x, field_y
     type(ESMF_Decomp_Flag) :: decompflagPTile(2,ntiles)
+    integer :: coordDimCount(2)
+    real(ESMF_KIND_R8), pointer :: dataPtr(:,:), coordPtr(:,:)
+    integer :: ldeCount, lde
 
     ! Set decomposition
     decomptile(1,:) = decomp_dim1
@@ -131,19 +134,49 @@ contains
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! Create field
-    field = ESMF_FieldCreate(grid, arraySpec, staggerloc=ESMF_STAGGERLOC_CENTER, &
-         indexflag=ESMF_INDEX_GLOBAL, name='dummy', rc=rc)
+    ! Create fields
+    field_x = ESMF_FieldCreate(grid, arraySpec, staggerloc=ESMF_STAGGERLOC_CENTER, &
+         indexflag=ESMF_INDEX_GLOBAL, name='dummy_x', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    field_y = ESMF_FieldCreate(grid, arraySpec, staggerloc=ESMF_STAGGERLOC_CENTER, &
+         indexflag=ESMF_INDEX_GLOBAL, name='dummy_y', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! Fill field
-    call ESMF_FieldFill(field, dataFillScheme='sincos', rc=rc)
+    ! Fill fields (this code based on implementation of ESMF_FieldFill, with dimCount = 2,
+    ! coordDimCount = [2,2]): Fill the x field with the x coord and the y field with the y
+    ! coord.
+    call ESMF_FieldGet(field_x, localDeCount=ldeCount)
+    ! For now, ldeCount will always be 1, but handle generality
+    do lde = 0, ldeCount-1
+       ! x coord
+       call ESMF_GridGetCoord(grid, coordDim=1, localDe=lde, farrayPtr=coordPtr, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       call ESMF_FieldGet(field_x, localDe=lde, farrayPtr=dataPtr, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       dataPtr(:,:) = coordPtr(:,:)
+    end do
+    call ESMF_FieldGet(field_y, localDeCount=ldeCount)
+    ! For now, ldeCount will always be 1, but handle generality
+    do lde = 0, ldeCount-1
+       ! y coord
+       call ESMF_GridGetCoord(grid, coordDim=2, localDe=lde, farrayPtr=coordPtr, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       call ESMF_FieldGet(field_y, localDe=lde, farrayPtr=dataPtr, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       dataPtr(:,:) = coordPtr(:,:)
+    end do
+
+    ! Write fields
+    call ESMF_FieldWrite(field_x, fileName=fname, variableName='x', overwrite=.true., rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    ! Try to write field, this is failing !!!
-    call ESMF_FieldWrite(field, fileName=fname, variableName='dummy', overwrite=.true., rc=rc)
+    call ESMF_FieldWrite(field_y, fileName=fname, variableName='y', overwrite=.true., rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
