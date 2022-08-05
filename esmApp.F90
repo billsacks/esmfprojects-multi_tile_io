@@ -106,7 +106,8 @@ contains
     integer :: decomptile(2,ntiles)
     integer :: n
     type(ESMF_ArraySpec) :: arraySpec
-    type(ESMF_Field) :: field_x, field_y, field_y_copy
+    type(ESMF_Field) :: field_x, field_y, field_x_copy, field_y_copy
+    type(ESMF_Array) :: array_x
     type(ESMF_FieldBundle) :: fbundle
     type(ESMF_Decomp_Flag) :: decompflagPTile(2,ntiles)
     integer :: coordDimCount(2)
@@ -181,11 +182,22 @@ contains
        dataPtr(:,:) = coordPtr(:,:)
     end do
 
-    ! Create a FieldBundle with the two fields
+    ! Create a copy of the x field that uses the same array, so we can test writing the
+    ! same array twice from a single call.
+    call ESMF_FieldGet(field_x, array=array_x)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    field_x_copy = ESMF_FieldCreate(grid, array_x, staggerloc=ESMF_STAGGERLOC_CENTER, &
+         name='x_copy', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! Create a FieldBundle with the two fields plus the copy. Note that the copy will
+    ! reuse an existing IO decomposition.
     fbundle = ESMF_FieldBundleCreate(name="myfb", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    call ESMF_FieldBundleAdd(fbundle, [field_x, field_y], rc=rc)
+    call ESMF_FieldBundleAdd(fbundle, [field_x, field_y, field_x_copy], rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
@@ -194,16 +206,8 @@ contains
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    ! Also write one of the fields with a different name, to test that we can write a
-    ! separate field to an existing file; this one is writing an already-written field,
-    ! so should reuse the decomposition.
-    call ESMF_FieldWrite(field_x, fileName=fname, variableName='x_copy', overwrite=.true., rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-    ! And write a new field (that just happens to have the same data as an existing
-    ! field), again to test that we can write a separate field to an existing file, but
-    ! now needing its own decomposition.
+    ! Also write a new field (that just happens to have the same data as an existing
+    ! field), to test that we can write a separate field to an existing file.
     call ESMF_FieldWrite(field_y_copy, fileName=fname, variableName='y_copy', overwrite=.true., rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
