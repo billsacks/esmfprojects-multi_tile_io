@@ -107,6 +107,7 @@ contains
     integer :: n
     type(ESMF_ArraySpec) :: arraySpec
     type(ESMF_Field) :: field_x, field_y
+    type(ESMF_FieldBundle) :: fbundle
     type(ESMF_Decomp_Flag) :: decompflagPTile(2,ntiles)
     integer :: coordDimCount(2)
     real(ESMF_KIND_R8), pointer :: dataPtr(:,:), coordPtr(:,:)
@@ -136,11 +137,11 @@ contains
 
     ! Create fields
     field_x = ESMF_FieldCreate(grid, arraySpec, staggerloc=ESMF_STAGGERLOC_CENTER, &
-         indexflag=ESMF_INDEX_GLOBAL, name='dummy_x', rc=rc)
+         indexflag=ESMF_INDEX_GLOBAL, name='x', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     field_y = ESMF_FieldCreate(grid, arraySpec, staggerloc=ESMF_STAGGERLOC_CENTER, &
-         indexflag=ESMF_INDEX_GLOBAL, name='dummy_y', rc=rc)
+         indexflag=ESMF_INDEX_GLOBAL, name='y', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
@@ -172,11 +173,16 @@ contains
        dataPtr(:,:) = coordPtr(:,:)
     end do
 
-    ! Write fields
-    call ESMF_FieldWrite(field_x, fileName=fname, variableName='x', overwrite=.true., rc=rc)
+    ! Create a FieldBundle with the two fields
+    fbundle = ESMF_FieldBundleCreate(name="myfb", rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    call ESMF_FieldWrite(field_y, fileName=fname, variableName='y', overwrite=.true., rc=rc)
+    call ESMF_FieldBundleAdd(fbundle, [field_x, field_y], rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    ! Write fields
+    call ESMF_FieldBundleWrite(fbundle, fileName=fname, overwrite=.true., rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
