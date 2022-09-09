@@ -4,7 +4,7 @@ module test_writer
   private
 
   public :: write_singletile
-  public :: write_multitile
+  public :: write_and_read_multitile
 
 contains
   subroutine write_singletile(decomp_dim1, decomp_dim2, fname)
@@ -91,7 +91,7 @@ contains
 
   end subroutine write_singletile
 
-  subroutine write_multitile(decomp_dim1, decomp_dim2, fname)
+  subroutine write_and_read_multitile(decomp_dim1, decomp_dim2, fname)
     ! decomp_dim1 and decomp_dim2 should be of size ntiles, and should have a value for
     ! each tile
     integer, intent(in) :: decomp_dim1(:)
@@ -107,8 +107,11 @@ contains
     integer :: n
     type(ESMF_ArraySpec) :: arraySpec
     type(ESMF_Field) :: field_x, field_y, field_x_copy, field_y_copy
+    type(ESMF_Field) :: field_x_read, field_y_read, field_x_copy_read, field_y_copy_read
     type(ESMF_Array) :: array_x
+    type(ESMF_Array) :: array_x_read
     type(ESMF_FieldBundle) :: fbundle
+    type(ESMF_FieldBundle) :: fbundle_read
     type(ESMF_Decomp_Flag) :: decompflagPTile(2,ntiles)
     integer :: coordDimCount(2)
     real(ESMF_KIND_R8), pointer :: dataPtr(:,:), coordPtr(:,:)
@@ -141,11 +144,23 @@ contains
          indexflag=ESMF_INDEX_GLOBAL, name='x', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    field_x_read = ESMF_FieldCreate(grid, arraySpec, staggerloc=ESMF_STAGGERLOC_CENTER, &
+         indexflag=ESMF_INDEX_GLOBAL, name='x', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     field_y = ESMF_FieldCreate(grid, arraySpec, staggerloc=ESMF_STAGGERLOC_CENTER, &
          indexflag=ESMF_INDEX_GLOBAL, name='y', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    field_y_read = ESMF_FieldCreate(grid, arraySpec, staggerloc=ESMF_STAGGERLOC_CENTER, &
+         indexflag=ESMF_INDEX_GLOBAL, name='y', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     field_y_copy = ESMF_FieldCreate(grid, arraySpec, staggerloc=ESMF_STAGGERLOC_CENTER, &
+         indexflag=ESMF_INDEX_GLOBAL, name='y_copy', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    field_y_copy_read = ESMF_FieldCreate(grid, arraySpec, staggerloc=ESMF_STAGGERLOC_CENTER, &
          indexflag=ESMF_INDEX_GLOBAL, name='y_copy', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -191,6 +206,13 @@ contains
          name='x_copy', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    call ESMF_FieldGet(field_x_read, array=array_x_read)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    field_x_copy_read = ESMF_FieldCreate(grid, array_x_read, staggerloc=ESMF_STAGGERLOC_CENTER, &
+         name='x_copy', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Create a FieldBundle with the two fields plus the copy. Note that the copy will
     ! reuse an existing IO decomposition.
@@ -198,6 +220,12 @@ contains
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     call ESMF_FieldBundleAdd(fbundle, [field_x, field_y, field_x_copy], rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    fbundle_read = ESMF_FieldBundleCreate(name="myfb_read", rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    call ESMF_FieldBundleAdd(fbundle_read, [field_x_read, field_y_read, field_x_copy_read], rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
@@ -212,7 +240,15 @@ contains
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-  end subroutine write_multitile
+    ! Read fields
+    call ESMF_FieldBundleRead(fbundle_read, fileName=fname, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    call ESMF_FieldRead(field_y_copy_read, fileName=fname, variableName='y_copy', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  end subroutine write_and_read_multitile
 
 end module test_writer
 
@@ -228,7 +264,7 @@ program esmApp
   if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
        line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-  ! Note 10 DEs, in agreement with write_multitile
+  ! Note 10 DEs, in agreement with write_and_read_multitile
   call write_singletile( &
        decomp_dim1 = 2, &
        decomp_dim2 = 5, &
@@ -237,20 +273,20 @@ program esmApp
   ! Tiles 1, 3 and 5 each have one DE; tile 2 has 2 DEs along dimension 1; tile 4 has 3
   ! DEs along dimension 1; tile 6 has 2 DEs along dimension 2. The total processor count
   ! should be 10.
-  call write_multitile( &
+  call write_and_read_multitile( &
        decomp_dim1 = [1,2,1,3,1,1], &
        decomp_dim2 = [1,1,1,1,1,2], &
        fname = 'dummy_multitileA#.nc')
 
   ! Similar to the last version, but changing which tiles have multiple DEs; in
   ! particular, put multiple on the first tile
-  call write_multitile( &
+  call write_and_read_multitile( &
        decomp_dim1 = [3,1,2,1,1,1], &
        decomp_dim2 = [1,1,1,1,1,2], &
        fname = 'dummy_multitileB#.nc')
 
   ! Again similar, but swapping dim1 and dim2
-  call write_multitile( &
+  call write_and_read_multitile( &
        decomp_dim1 = [1,1,1,1,1,2], &
        decomp_dim2 = [3,1,2,1,1,1], &
        fname = 'dummy_multitileC#.nc')
