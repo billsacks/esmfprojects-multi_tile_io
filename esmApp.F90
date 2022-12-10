@@ -155,16 +155,22 @@ contains
     integer :: decomptile(2,ntiles)
     integer :: n
     type(ESMF_ArraySpec) :: arraySpec
+    type(ESMF_ArraySpec) :: arraySpec_w_ungridded
     type(ESMF_Field) :: field_x, field_y, field_x_copy, field_y_copy
+    type(ESMF_Field) :: field_w_ungridded
     type(ESMF_Field) :: field_x_read, field_y_read, field_x_copy_read, field_y_copy_read
+    type(ESMF_Field) :: field_w_ungridded_read
     type(ESMF_Array) :: array_x
     type(ESMF_Array) :: array_x_read
     type(ESMF_FieldBundle) :: fbundle
     type(ESMF_FieldBundle) :: fbundle_read
     type(ESMF_Decomp_Flag) :: decompflagPTile(2,ntiles)
     integer :: coordDimCount(2)
-    real(ESMF_KIND_R8), pointer :: dataPtr(:,:), coordPtr(:,:)
+    real(ESMF_KIND_R8), pointer :: dataPtr(:,:), coordPtrX(:,:), coordPtrY(:,:)
+    real(ESMF_KIND_R8), pointer :: dataPtr4d(:,:,:,:)
     integer :: ldeCount, lde
+    integer :: i, j, u1, u2
+    real :: multiplier
 
     ! Set decomposition
     decomptile(1,:) = decomp_dim1
@@ -185,6 +191,9 @@ contains
 
     ! Set type and rank for ESMF arrayspec
     call ESMF_ArraySpecSet(arraySpec, typekind=ESMF_TYPEKIND_R8, rank=2, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    call ESMF_ArraySpecSet(arraySpec_w_ungridded, typekind=ESMF_TYPEKIND_R8, rank=4, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
@@ -213,6 +222,22 @@ contains
          indexflag=ESMF_INDEX_GLOBAL, name='y_copy', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    field_w_ungridded = ESMF_FieldCreate(grid, arraySpec_w_ungridded, staggerloc=ESMF_STAGGERLOC_CENTER, &
+         indexflag=ESMF_INDEX_GLOBAL, name='w_ungridded', &
+         ungriddedLBound=[2,15], ungriddedUBound=[4,18], &
+         ! 2nd and 4th dimensions are ungridded dimensions
+         gridToFieldMap=[1,3], &
+         rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    field_w_ungridded_read = ESMF_FieldCreate(grid, arraySpec_w_ungridded, staggerloc=ESMF_STAGGERLOC_CENTER, &
+         indexflag=ESMF_INDEX_GLOBAL, name='w_ungridded', &
+         ungriddedLBound=[2,15], ungriddedUBound=[4,18], &
+         ! 2nd and 4th dimensions are ungridded dimensions
+         gridToFieldMap=[1,3], &
+         rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Fill fields (this code based on implementation of ESMF_FieldFill, with dimCount = 2,
     ! coordDimCount = [2,2]): Fill the x field with the x coord and the y field with the y
@@ -221,29 +246,53 @@ contains
     ! For now, ldeCount will always be 1, but handle generality
     do lde = 0, ldeCount-1
        ! x coord
-       call ESMF_GridGetCoord(grid, coordDim=1, localDe=lde, farrayPtr=coordPtr, rc=rc)
+       call ESMF_GridGetCoord(grid, coordDim=1, localDe=lde, farrayPtr=coordPtrX, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
        call ESMF_FieldGet(field_x, localDe=lde, farrayPtr=dataPtr, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-       dataPtr(:,:) = coordPtr(:,:)
+       dataPtr(:,:) = coordPtrX(:,:)
     end do
     call ESMF_FieldGet(field_y, localDeCount=ldeCount)
     ! For now, ldeCount will always be 1, but handle generality
     do lde = 0, ldeCount-1
        ! y coord
-       call ESMF_GridGetCoord(grid, coordDim=2, localDe=lde, farrayPtr=coordPtr, rc=rc)
+       call ESMF_GridGetCoord(grid, coordDim=2, localDe=lde, farrayPtr=coordPtrY, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
        call ESMF_FieldGet(field_y, localDe=lde, farrayPtr=dataPtr, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-       dataPtr(:,:) = coordPtr(:,:)
+       dataPtr(:,:) = coordPtrY(:,:)
        call ESMF_FieldGet(field_y_copy, localDe=lde, farrayPtr=dataPtr, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-       dataPtr(:,:) = coordPtr(:,:)
+       dataPtr(:,:) = coordPtrY(:,:)
+    end do
+    ! Fill field_w_ungridded in a more complex way
+    call ESMF_FieldGet(field_w_ungridded, localDeCount=ldeCount)
+    ! For now, ldeCount will always be 1, but handle generality
+    do lde = 0, ldeCount-1
+       call ESMF_GridGetCoord(grid, coordDim=1, localDe=lde, farrayPtr=coordPtrX, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       call ESMF_GridGetCoord(grid, coordDim=2, localDe=lde, farrayPtr=coordPtrY, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       call ESMF_FieldGet(field_w_ungridded, localDe=lde, farrayPtr=dataPtr4d, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       do u1 = 2,4
+          do u2 = 15,18
+             do i = lbound(dataPtr4d, 1), ubound(dataPtr4d, 1)
+                do j = lbound(dataPtr4d, 3), ubound(dataPtr4d, 3)
+                   multiplier = 10.**(u2-15)
+                   dataPtr4d(i,u1,j,u2) = u1*multiplier*(coordPtrX(i,j) - coordPtrY(i,j))
+                end do
+             end do
+          end do
+       end do
     end do
 
     ! Create a copy of the x field that uses the same array, so we can test writing the
@@ -289,6 +338,12 @@ contains
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    ! And write the field that has ungridded dimensions
+    call ESMF_FieldWrite(field_w_ungridded, fileName=fname, variableName='w_ungridded', &
+         overwrite=.true., rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     ! Read fields
     call ESMF_FieldBundleRead(fbundle_read, fileName=fname, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -296,6 +351,7 @@ contains
     call ESMF_FieldRead(field_y_copy_read, fileName=fname, variableName='y_copy', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    call ESMF_FieldRead(field_w_ungridded_read, fileName=fname, variableName='w_ungridded', rc=rc)
 
   end subroutine write_and_read_multitile
 
