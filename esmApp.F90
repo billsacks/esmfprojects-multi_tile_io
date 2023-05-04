@@ -381,20 +381,20 @@ program esmApp
   call write_and_read_multitile( &
        decomp_dim1 = [1,2,1,3,1,1], &
        decomp_dim2 = [1,1,1,1,1,2], &
-       fname = 'dummy_multitileA#.nc')
+       fname = 'dummy_multitileA*.nc')
 
   ! Similar to the last version, but changing which tiles have multiple DEs; in
   ! particular, put multiple on the first tile
   call write_and_read_multitile( &
        decomp_dim1 = [3,1,2,1,1,1], &
        decomp_dim2 = [1,1,1,1,1,2], &
-       fname = 'dummy_multitileB#.nc')
+       fname = 'dummy_multitileB*.nc')
 
   ! Again similar, but swapping dim1 and dim2
   call write_and_read_multitile( &
        decomp_dim1 = [1,1,1,1,1,2], &
        decomp_dim2 = [3,1,2,1,1,1], &
-       fname = 'dummy_multitileC#.nc')
+       fname = 'dummy_multitileC*.nc')
 
   ! Finalize ESMF
   call ESMF_Finalize()
