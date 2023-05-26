@@ -265,7 +265,6 @@ contains
     ! coordDimCount = [2,2]): Fill the x field with the x coord and the y field with the y
     ! coord.
     call ESMF_FieldGet(field_x, localDeCount=ldeCount)
-    ! For now, ldeCount will always be 1, but handle generality
     do lde = 0, ldeCount-1
        ! x coord
        call ESMF_GridGetCoord(grid, coordDim=1, localDe=lde, farrayPtr=coordPtrX, rc=rc)
@@ -277,7 +276,6 @@ contains
        dataPtr(:,:) = coordPtrX(:,:)
     end do
     call ESMF_FieldGet(field_y, localDeCount=ldeCount)
-    ! For now, ldeCount will always be 1, but handle generality
     do lde = 0, ldeCount-1
        ! y coord
        call ESMF_GridGetCoord(grid, coordDim=2, localDe=lde, farrayPtr=coordPtrY, rc=rc)
@@ -294,7 +292,6 @@ contains
     end do
     ! Fill field_w_ungridded in a more complex way
     call ESMF_FieldGet(field_w_ungridded, localDeCount=ldeCount)
-    ! For now, ldeCount will always be 1, but handle generality
     do lde = 0, ldeCount-1
        call ESMF_GridGetCoord(grid, coordDim=1, localDe=lde, farrayPtr=coordPtrX, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
