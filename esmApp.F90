@@ -160,12 +160,13 @@ contains
 
   end subroutine write_singletile
 
-  subroutine write_and_read_multitile(decomp_dim1, decomp_dim2, fname)
+  subroutine write_and_read_multitile(decomp_dim1, decomp_dim2, fname, delayout)
     ! decomp_dim1 and decomp_dim2 should be of size ntiles, and should have a value for
     ! each tile
     integer, intent(in) :: decomp_dim1(:)
     integer, intent(in) :: decomp_dim2(:)
     character(len=*), intent(in) :: fname
+    type(ESMF_DELayout), intent(in), optional :: delayout
 
     type(ESMF_Grid) :: grid
     integer :: rc
@@ -202,6 +203,7 @@ contains
     ! Create CS grid
     grid = ESMF_GridCreateMosaic(filename=trim(mosaic_file), &
          regDecompPTile=decomptile, tileFilePath=trim(input_dir), &
+         delayout=delayout, &
          decompflagPTile=decompflagPTile, &
          staggerlocList=(/ESMF_STAGGERLOC_CENTER, ESMF_STAGGERLOC_CORNER/), &
          indexflag=ESMF_INDEX_GLOBAL, &
@@ -384,6 +386,7 @@ program esmApp
 
   integer :: rc
   integer :: pet_map_singletile(5,4,1)
+  type(ESMF_DELayout) :: delayout
 
   ! Init ESMF
   call ESMF_Initialize(logkindflag=ESMF_LOGKIND_MULTI, defaultCalkind=ESMF_CALKIND_GREGORIAN, rc=rc)
@@ -431,6 +434,25 @@ program esmApp
        decomp_dim1 = [1,1,1,1,1,2], &
        decomp_dim2 = [3,1,2,1,1,1], &
        fname = 'dummy_multitileC*.nc')
+
+  ! Now with 0 or > 1 DE on some PETs. Here we have 20 DEs but still 10 PETs. The DEs
+  ! are scattered in a disorganized fashion across PETs. We have the following number of
+  ! DEs on each PET:
+  ! PET #: 0 1 2 3 4 5 6 7 8 9
+  ! # DEs: 1 2 3 4 2 0 2 4 0 2
+  !
+  ! Note that this is the same DE to PET mapping used in the single-tile case above.
+  !
+  ! For the decomposition, note that we now use a total of 20 DEs across the 6 tiles
+  ! (2,4,1,6,3,4)
+  delayout = ESMF_DELayoutCreate(petMap=[2,3,6,1,4,3,0,2,9,7,1,7,3,9,3,6,4,2,7,7], rc=rc)
+  if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+       line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+  call write_and_read_multitile( &
+       decomp_dim1 = [2,2,1,3,1,2], &
+       decomp_dim2 = [1,2,1,2,3,2], &
+       fname = 'dummy_multitile_desPerPet*.nc', &
+       delayout = delayout)
 
   ! Finalize ESMF
   call ESMF_Finalize()
