@@ -7,10 +7,11 @@ module test_writer
   public :: write_and_read_multitile
 
 contains
-  subroutine write_singletile(decomp_dim1, decomp_dim2, fname)
+  subroutine write_singletile(decomp_dim1, decomp_dim2, fname, pet_map)
     integer, intent(in) :: decomp_dim1
     integer, intent(in) :: decomp_dim2
     character(len=*), intent(in) :: fname
+    integer, intent(in), optional :: pet_map(:,:,:)
 
     type(ESMF_Grid) :: grid
     integer :: rc
@@ -35,6 +36,7 @@ contains
     grid = ESMF_GridCreateNoPeriDim( &
          maxIndex = [10, 20], &
          regDecomp = [decomp_dim1, decomp_dim2], &
+         petMap = pet_map, &
          coordSys = ESMF_COORDSYS_CART, &
          coordDep1 = [1], &
          coordDep2 = [2], &
@@ -47,24 +49,29 @@ contains
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-    call ESMF_GridGetCoord(grid, coordDim=1, localDE=0, &
-         staggerloc=ESMF_STAGGERLOC_CENTER, &
-         computationalLBound=lbndX, computationalUBound=ubndX, &
-         farrayPtr=coordX, rc=rc)
+    call ESMF_GridGet(grid, localDECount=ldeCount, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    do i = lbndX(1), ubndX(1)
-       coordX(i) = i*10.0
-    end do
+    do lde = 0, ldeCount-1
+       call ESMF_GridGetCoord(grid, coordDim=1, localDE=lde, &
+            staggerloc=ESMF_STAGGERLOC_CENTER, &
+            computationalLBound=lbndX, computationalUBound=ubndX, &
+            farrayPtr=coordX, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       do i = lbndX(1), ubndX(1)
+          coordX(i) = i*10.0
+       end do
 
-    call ESMF_GridGetCoord(grid, coordDim=2, localDE=0, &
-         staggerloc=ESMF_STAGGERLOC_CENTER, &
-         computationalLBound=lbndY, computationalUBound=ubndY, &
-         farrayPtr=coordY, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    do j = lbndY(1), ubndY(1)
-       coordY(j) = j*10.0
+       call ESMF_GridGetCoord(grid, coordDim=2, localDE=lde, &
+            staggerloc=ESMF_STAGGERLOC_CENTER, &
+            computationalLBound=lbndY, computationalUBound=ubndY, &
+            farrayPtr=coordY, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       do j = lbndY(1), ubndY(1)
+          coordY(j) = j*10.0
+       end do
     end do
 
     ! ------------------------------------------------------------------------
@@ -113,9 +120,22 @@ contains
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Fill field
-    call ESMF_FieldGet(field_w_ungridded, localDeCount=ldeCount)
-    ! For now, ldeCount will always be 1, but handle generality
+    call ESMF_FieldGet(field_w_ungridded, localDeCount=ldeCount, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     do lde = 0, ldeCount-1
+       call ESMF_GridGetCoord(grid, coordDim=1, localDE=lde, &
+            staggerloc=ESMF_STAGGERLOC_CENTER, &
+            computationalLBound=lbndX, computationalUBound=ubndX, &
+            farrayPtr=coordX, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       call ESMF_GridGetCoord(grid, coordDim=2, localDE=lde, &
+            staggerloc=ESMF_STAGGERLOC_CENTER, &
+            computationalLBound=lbndY, computationalUBound=ubndY, &
+            farrayPtr=coordY, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
        call ESMF_FieldGet(field_w_ungridded, localDe=lde, farrayPtr=dataPtr4d, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
             line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -363,6 +383,7 @@ program esmApp
   implicit none
 
   integer :: rc
+  integer :: pet_map_singletile(5,4,1)
 
   ! Init ESMF
   call ESMF_Initialize(logkindflag=ESMF_LOGKIND_MULTI, defaultCalkind=ESMF_CALKIND_GREGORIAN, rc=rc)
@@ -374,6 +395,21 @@ program esmApp
        decomp_dim1 = 2, &
        decomp_dim2 = 5, &
        fname = 'dummy_singletile.nc')
+
+  ! Test with 0 or > 1 DE on some PETs. Here we have 20 DEs but still 10 PETs. The DEs
+  ! are scattered in a disorganized fashion across PETs. We have the following number of
+  ! DEs on each PET:
+  ! PET #: 0 1 2 3 4 5 6 7 8 9
+  ! # DEs: 1 2 3 4 2 0 2 4 0 2
+  pet_map_singletile(:,1,1) = [2,3,6,1,4]
+  pet_map_singletile(:,2,1) = [3,0,2,9,7]
+  pet_map_singletile(:,3,1) = [1,7,3,9,3]
+  pet_map_singletile(:,4,1) = [6,4,2,7,7]
+  call write_singletile( &
+       decomp_dim1 = 5, &
+       decomp_dim2 = 4, &
+       fname = 'dummy_singletile_desPerPet.nc', &
+       pet_map = pet_map_singletile)
 
   ! Tiles 1, 3 and 5 each have one DE; tile 2 has 2 DEs along dimension 1; tile 4 has 3
   ! DEs along dimension 1; tile 6 has 2 DEs along dimension 2. The total processor count
