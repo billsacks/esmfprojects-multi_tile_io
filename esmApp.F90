@@ -3,11 +3,11 @@ module test_writer
   implicit none
   private
 
-  public :: write_singletile
+  public :: write_and_read_singletile
   public :: write_and_read_multitile
 
 contains
-  subroutine write_singletile(decomp_dim1, decomp_dim2, fname, pet_map)
+  subroutine write_and_read_singletile(decomp_dim1, decomp_dim2, fname, pet_map)
     integer, intent(in) :: decomp_dim1
     integer, intent(in) :: decomp_dim2
     character(len=*), intent(in) :: fname
@@ -23,8 +23,8 @@ contains
     real(ESMF_KIND_R8), pointer :: dataPtr4d(:,:,:,:)
     type(ESMF_ArraySpec) :: arraySpec
     type(ESMF_ArraySpec) :: arraySpec_w_ungridded
-    type(ESMF_Field) :: field
-    type(ESMF_Field) :: field_w_ungridded
+    type(ESMF_Field) :: field, field_read
+    type(ESMF_Field) :: field_w_ungridded, field_w_ungridded_read
 
     ! ------------------------------------------------------------------------
     ! Create grid
@@ -88,6 +88,10 @@ contains
          indexflag=ESMF_INDEX_GLOBAL, name='dummy', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    field_read = ESMF_FieldCreate(grid, arraySpec, staggerloc=ESMF_STAGGERLOC_CENTER, &
+         indexflag=ESMF_INDEX_GLOBAL, name='dummy', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
     ! Fill field
     call ESMF_FieldFill(field, dataFillScheme='sincos', rc=rc)
@@ -101,6 +105,13 @@ contains
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
+    !------------------------------------------------------------------------
+    ! Read field
+    !------------------------------------------------------------------------
+    call ESMF_FieldRead(field_read, fileName=fname, variableName='dummy', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
     ! ------------------------------------------------------------------------
     ! Create field with two ungridded dimensions
     ! ------------------------------------------------------------------------
@@ -111,6 +122,14 @@ contains
 
     ! Create field
     field_w_ungridded = ESMF_FieldCreate(grid, arraySpec_w_ungridded, staggerloc=ESMF_STAGGERLOC_CENTER, &
+         indexflag=ESMF_INDEX_GLOBAL, name='dummy_w_ungridded', &
+         ungriddedLBound=[2,15], ungriddedUBound=[4,18], &
+         ! 2nd and 4th dimensions are ungridded dimensions
+         gridToFieldMap=[1,3], &
+         rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    field_w_ungridded_read = ESMF_FieldCreate(grid, arraySpec_w_ungridded, staggerloc=ESMF_STAGGERLOC_CENTER, &
          indexflag=ESMF_INDEX_GLOBAL, name='dummy_w_ungridded', &
          ungriddedLBound=[2,15], ungriddedUBound=[4,18], &
          ! 2nd and 4th dimensions are ungridded dimensions
@@ -158,7 +177,14 @@ contains
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-  end subroutine write_singletile
+    ! ------------------------------------------------------------------------
+    ! Read field with ungridded dimensions
+    ! ------------------------------------------------------------------------
+    call ESMF_FieldRead(field_w_ungridded_read, fileName=fname, variableName='dummy_w_ungridded', rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+  end subroutine write_and_read_singletile
 
   subroutine write_and_read_multitile(decomp_dim1, decomp_dim2, fname, delayout)
     ! decomp_dim1 and decomp_dim2 should be of size ntiles, and should have a value for
@@ -393,7 +419,7 @@ program esmApp
        line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   ! Note 10 DEs, in agreement with write_and_read_multitile
-  call write_singletile( &
+  call write_and_read_singletile( &
        decomp_dim1 = 2, &
        decomp_dim2 = 5, &
        fname = 'dummy_singletile.nc')
@@ -407,7 +433,7 @@ program esmApp
   pet_map_singletile(:,2,1) = [3,0,2,9,7]
   pet_map_singletile(:,3,1) = [1,7,3,9,3]
   pet_map_singletile(:,4,1) = [6,4,2,7,7]
-  call write_singletile( &
+  call write_and_read_singletile( &
        decomp_dim1 = 5, &
        decomp_dim2 = 4, &
        fname = 'dummy_singletile_desPerPet.nc', &
