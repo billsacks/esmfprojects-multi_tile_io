@@ -20,11 +20,15 @@ contains
     integer :: lbndX(2), ubndX(2), lbndY(2), ubndY(2)
     real :: multiplier
     real(ESMF_KIND_R8), pointer :: coordX(:), coordY(:)
-    real(ESMF_KIND_R8), pointer :: dataPtr4d(:,:,:,:)
+    real(ESMF_KIND_R8), pointer :: dataPtr4d(:,:,:,:), dataPtr4dRead(:,:,:,:)
     type(ESMF_ArraySpec) :: arraySpec
     type(ESMF_ArraySpec) :: arraySpec_w_ungridded
     type(ESMF_Field) :: field, field_read
     type(ESMF_Field) :: field_w_ungridded, field_w_ungridded_read
+
+    type(ESMF_VM) :: vm
+    integer :: localPet
+    logical :: allEqual
 
     ! ------------------------------------------------------------------------
     ! Create grid
@@ -183,6 +187,36 @@ contains
     call ESMF_FieldRead(field_w_ungridded_read, fileName=fname, variableName='dummy_w_ungridded', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    !------------------------------------------------------------------------
+    ! Confirm that read-in field matches original
+    !------------------------------------------------------------------------
+    call ESMF_VMGetGlobal(vm, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    call ESMF_VMGet(vm, localPet=localPet, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    call ESMF_FieldGet(field_w_ungridded, localDeCount=ldeCount, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    do lde = 0, ldeCount-1
+       call ESMF_FieldGet(field_w_ungridded, localDe=lde, farrayPtr=dataPtr4d, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       call ESMF_FieldGet(field_w_ungridded_read, localDe=lde, farrayPtr=dataPtr4dRead, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       allEqual = all(dataPtr4dRead == dataPtr4d)
+       print *, 'localPet = ', localPet, 'lde = ', lde, 'allEqual = ', allEqual
+       if (.not. allEqual) then
+          if (ESMF_LogFoundError(ESMF_RC_OBJ_BAD, &
+               msg="Read-in data differ from original", &
+               line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       end if
+    end do
 
   end subroutine write_and_read_singletile
 
