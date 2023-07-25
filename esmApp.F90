@@ -26,8 +26,6 @@ contains
     type(ESMF_Field) :: field, field_read
     type(ESMF_Field) :: field_w_ungridded, field_w_ungridded_read
 
-    type(ESMF_VM) :: vm
-    integer :: localPet
     logical :: allEqual
 
     ! ------------------------------------------------------------------------
@@ -191,13 +189,6 @@ contains
     !------------------------------------------------------------------------
     ! Confirm that read-in field matches original
     !------------------------------------------------------------------------
-    call ESMF_VMGetGlobal(vm, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-    call ESMF_VMGet(vm, localPet=localPet, rc=rc)
-    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-
     call ESMF_FieldGet(field_w_ungridded, localDeCount=ldeCount, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
@@ -210,7 +201,6 @@ contains
             line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
        allEqual = all(dataPtr4dRead == dataPtr4d)
-       print *, 'localPet = ', localPet, 'lde = ', lde, 'allEqual = ', allEqual
        if (.not. allEqual) then
           if (ESMF_LogFoundError(ESMF_RC_OBJ_BAD, &
                msg="Read-in data differ from original", &
