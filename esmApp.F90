@@ -238,10 +238,11 @@ contains
     type(ESMF_Decomp_Flag) :: decompflagPTile(2,ntiles)
     integer :: coordDimCount(2)
     real(ESMF_KIND_R8), pointer :: dataPtr(:,:), coordPtrX(:,:), coordPtrY(:,:)
-    real(ESMF_KIND_R8), pointer :: dataPtr4d(:,:,:,:)
+    real(ESMF_KIND_R8), pointer :: dataPtr4d(:,:,:,:), dataPtr4dRead(:,:,:,:)
     integer :: ldeCount, lde
     integer :: i, j, u1, u2
     real :: multiplier
+    logical :: allEqual
 
     ! Set decomposition
     decomptile(1,:) = decomp_dim1
@@ -315,6 +316,8 @@ contains
     ! coordDimCount = [2,2]): Fill the x field with the x coord and the y field with the y
     ! coord.
     call ESMF_FieldGet(field_x, localDeCount=ldeCount)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
     do lde = 0, ldeCount-1
        ! x coord
        call ESMF_GridGetCoord(grid, coordDim=1, localDe=lde, farrayPtr=coordPtrX, rc=rc)
@@ -423,6 +426,28 @@ contains
     call ESMF_FieldRead(field_w_ungridded_read, fileName=fname, variableName='w_ungridded', rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
          line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+    !------------------------------------------------------------------------
+    ! Confirm that read-in field matches original for the complex case with ungridded dimensions
+    !------------------------------------------------------------------------
+    call ESMF_FieldGet(field_x, localDeCount=ldeCount)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+    do lde = 0, ldeCount-1
+       call ESMF_FieldGet(field_w_ungridded, localDe=lde, farrayPtr=dataPtr4d, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       call ESMF_FieldGet(field_w_ungridded_read, localDe=lde, farrayPtr=dataPtr4dRead, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+
+       allEqual = all(dataPtr4dRead == dataPtr4d)
+       if (.not. allEqual) then
+          if (ESMF_LogFoundError(ESMF_RC_OBJ_BAD, &
+               msg="Read-in data differ from original", &
+               line=__LINE__, file=__FILE__)) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+       end if
+    end do
 
   end subroutine write_and_read_multitile
 
